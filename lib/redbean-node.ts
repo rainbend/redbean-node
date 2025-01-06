@@ -195,14 +195,17 @@ export class RedBeanNode {
             }
 
         } else {
-            let queryPromise = this.knex(bean.getType()).insert(obj, ['id']);
-            this.queryLog(queryPromise);
-            let result = await queryPromise;
             if (this.dbType === "pg") {
                 // https://knexjs.org/guide/query-builder.html#insert
                 // postgresql requires setting returning to return data.
+                let queryPromise = this.knex(bean.getType()).insert(obj, ['id']);
+                this.queryLog(queryPromise);
+                let result = await queryPromise;
                 bean.id = result[0].id;
             } else {
+                let queryPromise = this.knex(bean.getType()).insert(obj);
+                this.queryLog(queryPromise);
+                let result = await queryPromise;
                 bean.id = result[0];
             }
         }

@@ -133,6 +133,10 @@ module.exports = () => {
                     let list  = await R.find('test_find', ' active = 1 ');
 
                     expect(list.length).gt(0);
+
+                    list  = await R.find('test_find', ' active = true ');
+
+                    expect(list.length).gt(0);
                 }
 
 
