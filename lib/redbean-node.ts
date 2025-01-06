@@ -9,7 +9,6 @@ import BeanConverterStream from "./bean-converter-stream";
 import AwaitLock from "await-lock";
 import StaticConnectionConfig = Knex.StaticConnectionConfig;
 import PoolConfig = Knex.PoolConfig;
-import Client = Knex.Client;
 import RawBinding = Knex.RawBinding;
 import QueryBuilder = Knex.QueryBuilder;
 // import PromisePool from 'es6-promise-pool';
@@ -70,7 +69,7 @@ export class RedBeanNode {
             }
 
             if (dbType == "mariadb") {
-                dbType = "mysql";
+                dbType = "mysql2";
             }
 
             this.dbType = dbType;
@@ -84,6 +83,9 @@ export class RedBeanNode {
                 pool
             });
 
+            if (this.dbType === "mysql2") {
+                this.dbType = "mysql";
+            }
         } else {
             this._knex = dbType;
             this.dbType = this._knex.client.config.client;
@@ -193,11 +195,16 @@ export class RedBeanNode {
             }
 
         } else {
-            let queryPromise = this.knex(bean.getType()).insert(obj);
-
+            let queryPromise = this.knex(bean.getType()).insert(obj, ['id']);
             this.queryLog(queryPromise);
             let result = await queryPromise;
-            bean.id = result[0];
+            if (this.dbType === "pg") {
+                // https://knexjs.org/guide/query-builder.html#insert
+                // postgresql requires setting returning to return data.
+                bean.id = result[0].id;
+            } else {
+                bean.id = result[0];
+            }
         }
 
 
@@ -512,13 +519,12 @@ export class RedBeanNode {
 
         if (this.dbType == "sqlite") {
             e = error.message;
-
         } else if (this.dbType == "mysql") {
             e = error.code;
-
         } else if (this.dbType == "mssql") {
             e = error.message;
-
+        } else if (this.dbType == "pg") {
+            e = error.message;
         }
 
         if (!e) {
@@ -575,6 +581,9 @@ export class RedBeanNode {
 
             // MSSQL
             "Invalid object name",
+
+            // Postgres
+            "does not exist",
         ]);
     }
 
@@ -592,7 +601,10 @@ export class RedBeanNode {
 
             // MYSQL
             "ER_TABLE_EXISTS_ERROR",
-            "ER_DUP_FIELDNAME"
+            "ER_DUP_FIELDNAME",
+
+            // Postgres
+            "already exists",
         ]);
     }
 
@@ -740,7 +752,10 @@ export class RedBeanNode {
                 }
 
             } else {
-                let limitTemplate = this.knex.limit(1).toSQL().toNative();
+                let limitTemplate = this.knex.limit(1).toSQL()
+                if (this.dbType !== "pg") {
+                    limitTemplate = limitTemplate.toNative()
+                }
 
                 // LIMIT 1
                 sql = sql + limitTemplate.sql.replace("select *", "");
@@ -772,6 +787,8 @@ export class RedBeanNode {
 
         if (this.dbType == "mysql") {
             result = result[0];
+        } else if (this.dbType == "pg") {
+            result = result.rows
         }
 
         return result;
@@ -832,7 +849,10 @@ export class RedBeanNode {
         }
 
         try {
-            return await this.getCell(`SELECT COUNT(*) FROM ?? ${where}`, [
+            // https://github.com/brianc/node-pg-types/blob/master/README.md#:~:text=Let%27s%20do%20something,would%20do%20this%3A
+            // https://www.postgresql.org/docs/8.2/functions-aggregate.html
+            // Because the postgres count(*) function returns a bigint type, but javascript does not support int8, node-postgres processes int8 as a string to prevent numeric overflow.
+            return await this.getCell(`SELECT COUNT(*)${this.dbType === "pg"? "::int" : ""} FROM ?? ${where}`, [
                 type,
                 ...data,
             ], autoLimit)
@@ -1121,6 +1141,14 @@ export class RedBeanNode {
 
     get modelList() {
         return this._modelList;
+    }
+
+    /**
+     * Transforming identifier names automatically to quoted versions for each dialect
+     * @param value
+     */
+    wrapIdentifier(value: string) {
+        return this.knex.client.wrapIdentifierImpl(value)
     }
 
 }

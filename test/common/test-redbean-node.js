@@ -125,9 +125,16 @@ module.exports = () => {
                 bean.active = true;
                 await R.store(bean);
 
-                let list  = await R.find('test_find', ' active = 1 ');
+                if (R.dbType === "pg") {
+                    let list  = await R.find('test_find', ' active = true ');
 
-                expect(list.length).gt(0);
+                    expect(list.length).gt(0);
+                } else {
+                    let list  = await R.find('test_find', ' active = 1 ');
+
+                    expect(list.length).gt(0);
+                }
+
 
                 list  = await R.findAll('test_find');
                 expect(list.length).to.equal(2);
@@ -374,6 +381,14 @@ module.exports = () => {
             });
         });
 
+        it ("#R.wrapIdentifier", () => {
+            const rawSQL = `select ${R.wrapIdentifier("key")} from ${R.wrapIdentifier("user")}`
+            if (R.dbType === "pg") {
+                assert.equal(rawSQL, `select "key" from "user"`);
+            } else {
+                assert.equal(rawSQL, "select `key` from `user`");
+            }
+        })
 
     });
 
@@ -453,13 +468,22 @@ module.exports = () => {
             bean.value = "abc";
             await R.store(bean);
             info = await R.inspect("test_field");
-            expect(["varchar"]).to.include(info["string"].type);
-            expect(["varchar"]).to.include(info["value"].type);
+            if (R.dbType === "pg") {
+                expect(["character varying"]).to.include(info["string"].type);
+                expect(["character varying"]).to.include(info["value"].type);
+            } else {
+                expect(["varchar"]).to.include(info["string"].type);
+                expect(["varchar"]).to.include(info["value"].type);
+            }
 
             bean.float = 1.1;
             await R.store(bean);
             info = await R.inspect("test_field");
-            expect(["float"]).to.include(info["float"].type);
+            if (R.dbType === "pg") {
+                expect(["real"]).to.include(info["float"].type);
+            } else {
+                expect(["float"]).to.include(info["float"].type);
+            }
 
             bean.bool = 1;
             bean.bool2 = false;
@@ -482,12 +506,19 @@ module.exports = () => {
             bean.dateTime = R.isoDateTime();
             await R.store(bean);
             info = await R.inspect("test_field");
-            expect(["datetime"]).to.include(info["date_time"].type);
-
+            if (R.dbType === "pg") {
+                expect(["timestamp with time zone"]).to.include(info["date_time"].type);
+            } else {
+                expect(["datetime"]).to.include(info["date_time"].type);
+            }
             bean.dateTimeMillis = R.isoDateTimeMillis();
             await R.store(bean);
             info = await R.inspect("test_field");
-            expect(["datetime"]).to.include(info["date_time"].type);
+            if (R.dbType === "pg") {
+                expect(["timestamp with time zone"]).to.include(info["date_time"].type);
+            } else {
+                expect(["datetime"]).to.include(info["date_time"].type);
+            }
 
             bean.date = R.isoDate();
             await R.store(bean);
@@ -497,19 +528,31 @@ module.exports = () => {
             bean.time = R.isoTime();
             await R.store(bean);
             info = await R.inspect("test_field");
-            expect(["time"]).to.include(info["time"].type);
+            if (R.dbType === "pg") {
+                expect(["time without time zone"]).to.include(info["time"].type);
+            } else {
+                expect(["time"]).to.include(info["time"].type);
+            }
 
             bean.timeMillis = R.isoTimeMillis();
             await R.store(bean);
             info = await R.inspect("test_field");
-            expect(["time"]).to.include(info["time"].type);
+            if (R.dbType === "pg") {
+                expect(["time without time zone"]).to.include(info["time"].type);
+            } else {
+                expect(["time"]).to.include(info["time"].type);
+            }
 
             bean.bool = 2
 
             try {
                 await R.store(bean);
                 info = await R.inspect("test_field");
-                expect(["int"]).to.include(info["bool"].type);
+                if (R.dbType === "pg") {
+                    expect(["integer"]).to.include(info["bool"].type);
+                } else {
+                    expect(["int"]).to.include(info["bool"].type);
+                }
             } catch (e) {
                 if (R.dbType != "sqlite") {
                     throw e;
