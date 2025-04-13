@@ -15,7 +15,7 @@ RedBeanNode is an easy to use **ORM** tool for Node.js, strongly inspired by Red
 * Ported RedBeanPHP's main features and api design
 * Supports **JavaScript** & **TypeScript**
 * **async/await** or **promise** friendly
-* Supports MySQL / MariaDB / SQLite
+* Supports MySQL / MariaDB / SQLite / PostgreSQL
 
 ## Code Example
 
